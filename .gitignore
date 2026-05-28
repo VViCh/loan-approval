@@ -1,0 +1,19 @@
+# Ignore model artifacts and charts
+models/
+charts/
+*.pkl
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual env
+venv/
+env/
+
+# OS files
+.DS_Store
+
