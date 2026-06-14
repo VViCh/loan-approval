@@ -33,13 +33,14 @@ A Scikit-Learn `ColumnTransformer` encapsulates all transformations in a single 
 - **Ordinal features (`person_education`):** Mode imputation → `OrdinalEncoder` with the hierarchy High School < Associate < Bachelor < Master < Doctorate
 - **Nominal features:** Mode imputation → `OneHotEncoder` (first category dropped)
 
-### 3.2 Class Imbalance Handling
+### 3.2 Class Imbalance Handling (SMOTE)
 
-SMOTE (Synthetic Minority Over-sampling Technique) is applied within the `imblearn` pipeline to generate synthetic examples of the minority class. Critically, SMOTE is only applied to training data — never to test or validation folds — preventing information leakage.
+**How we handled class imbalance:** The dataset is highly imbalanced (approximately 78% rejected, 22% approved). If left untreated, a model could achieve 78% accuracy simply by guessing "Rejected" for every applicant. 
+To resolve this, we used **SMOTE** (Synthetic Minority Over-sampling Technique). SMOTE artificially generates new, realistic synthetic examples of the minority class (Approved loans) using a Nearest Neighbors algorithm until the classes are perfectly balanced.
 
-**Justification:** Brown & Mues (2012) demonstrate that resampling techniques significantly improve classifier performance on imbalanced credit scoring datasets, which directly parallels this study's domain.
+**Preventing Data Leakage:** Critically, SMOTE is applied within an `imblearn` pipeline. This ensures SMOTE is *only* applied to the training data folds during cross-validation—never to the test or validation folds—preventing synthetic data from leaking into the test set and artificially inflating the score.
 
-**Empirical validation:** The notebook includes a direct comparison of Logistic Regression trained with and without SMOTE, demonstrating the recall improvement on the minority class.
+**Empirical validation:** The notebook includes a direct comparison of Logistic Regression trained with and without SMOTE, demonstrating a massive recall improvement on the minority class.
 
 ### 3.3 Classifiers
 
@@ -55,13 +56,23 @@ Five algorithms, as specified in the proposal:
 
 ### 3.4 Hyperparameter Tuning
 
-`GridSearchCV` with Stratified 5-Fold cross-validation, scored on **ROC-AUC**. ROC-AUC is preferred over accuracy because accuracy can be misleading under class imbalance (Lessmann et al., 2015).
+**Are the models tuned?** Yes. While Logistic Regression and Decision Trees were kept as raw baselines, the complex models (Random Forest, SVM, KNN) underwent rigorous hyperparameter tuning to find their absolute optimal configurations for this specific dataset.
 
-| Model | Tuned Parameters |
+**How tuning was done (GridSearchCV Utilization):** 
+To ensure maximum performance without overfitting, we utilized Scikit-Learn's `GridSearchCV`. This algorithm performs an exhaustive mathematical search to find the optimal configuration for a model. The process was executed in three detailed steps:
+
+1. **Defining the Hyperparameter Grid:** Instead of guessing values, we provided a "grid" (a dictionary) of potential hyperparameters for each model. For example, for the Random Forest, we supplied a grid containing `n_estimators` (100, 200), `max_depth` (None, 10, 20), and `min_samples_split` (2, 5).
+2. **Exhaustive Combinatorial Search:** `GridSearchCV` calculates every possible mathematical combination of these parameters (e.g., a Random Forest with 100 trees + max depth of 10 + min split of 2, then 200 trees + max depth of 10, etc.). It trains a completely new model from scratch for *every single combination*.
+3. **Stratified 5-Fold Evaluation:** To prove the combinations actually worked, `GridSearchCV` was wrapped in **Stratified 5-Fold Cross-Validation**. Every single parameter combination was tested 5 separate times on 5 different chunks of the dataset. "Stratified" ensures that every validation fold maintained the exact 78/22 class ratio of the original dataset.
+4. **Scoring Metric:** The Grid Search evaluated the success of each combination using the **ROC-AUC** metric (rather than basic accuracy) to properly penalize the model for false positives and false negatives under class imbalance conditions.
+
+The optimal combinations discovered and locked in by the Grid Search were:
+
+| Model | Tuned Parameters Evaluated & Optimized |
 |---|---|
-| Random Forest | `n_estimators`, `max_depth`, `min_samples_split` |
-| SVM | `C`, `kernel` |
-| KNN | `n_neighbors`, `weights` |
+| Random Forest | `n_estimators` (number of trees), `max_depth` (to prevent overfitting), `min_samples_split` |
+| SVM | `C` (regularization penalty), `kernel` (linear vs rbf) |
+| KNN | `n_neighbors` (how many profiles to compare), `weights` (uniform vs distance) |
 
 Cross-validation results are reported as **mean ± standard deviation** across folds.
 
@@ -77,6 +88,26 @@ As defined in the proposal, with the addition of ROC-AUC:
 - **Confusion Matrix** — detailed breakdown of true/false positives and negatives
 
 ROC-AUC was added because in loan approval, the relative cost of false positives (approving a default) vs false negatives (rejecting a viable loan) makes threshold-independent metrics essential.
+
+### 3.6 Known Data Anomalies & Limitations
+
+During testing and Exploratory Data Analysis, several critical data characteristics were identified that impact model deployment:
+
+- **Perfect Categorical Correlation (Data Leakage):** Categorical analysis revealed that 100% of applicants with `previous_loan_defaults_on_file == "Yes"` were rejected. The ML models learned this as a dominant rule.
+- **Heatmap Limitations:** Because standard Pandas correlation matrices (`df.corr()`) only evaluate continuous numerical variables, the massive predictive power of `previous_loan_defaults_on_file` was excluded from `correlation_heatmap.png`, underscoring the importance of independent categorical distribution analysis.
+- **Out-Of-Distribution (OOD) Blindness:** Extreme outliers (e.g., $1,000,000 loan with $100 income) were removed during preprocessing. While this improved model accuracy on normal data, it left the model blind to impossible edge cases. In production, this requires a Business Logic Engine (hard-coded `if/else` rules) to intercept and auto-reject impossible debt-to-income ratios before they reach the ML model.
+
+### 3.7 Feature Ablation Experiment
+
+A feature ablation experiment was conducted on the Tuned Random Forest model to observe the impact of individual features on overall predictive performance. The results are as follows:
+
+1. **Baseline (All 13 Features):** `0.9735 ROC-AUC`
+2. **Dropped `person_gender`:** `0.9744 ROC-AUC` 
+   *(Insight: Performance improved. This indicates that gender acted as statistical noise without predictive value).*
+3. **Dropped `person_gender` & `loan_intent`:** `0.9696 ROC-AUC`
+   *(Insight: Performance decreased. This indicates that loan intent carries significant predictive signal).*
+4. **Dropped `previous_loan_defaults_on_file`:** `0.9232 ROC-AUC`
+   *(Insight: A significant performance drop. This confirms the model relies heavily on the perfect correlation of this single feature, as identified in Section 3.6).*
 
 ## 4. Deployment
 
