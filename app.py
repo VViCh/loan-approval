@@ -6,12 +6,11 @@ import os
 
 app = Flask(__name__)
 
-# ── Model Registry ──
 MODEL_DIR = "models"
 MODEL_INFO_PATH = os.path.join(MODEL_DIR, "model_info.json")
-pipelines = {}       # key -> loaded pipeline
-model_info = {}      # full model_info.json contents
-default_model = ""   # key of the best model
+pipelines = {}
+model_info = {}
+default_model = ""
 
 
 def load_all_models():
@@ -40,7 +39,7 @@ def load_all_models():
 load_all_models()
 
 
-# ── Routes ──
+# Routes
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -48,7 +47,6 @@ def index():
 
 @app.route("/api/models")
 def list_models():
-    """Return available models and their metrics so the frontend can populate the selector."""
     models_list = []
     for key, meta in model_info.get("models", {}).items():
         models_list.append({
@@ -61,7 +59,7 @@ def list_models():
             "f1": meta.get("f1"),
             "roc_auc": meta.get("roc_auc"),
         })
-    # Sort so default is first, then by roc_auc descending
+    
     models_list.sort(key=lambda m: (not m["is_default"], -(m["roc_auc"] or 0)))
     return jsonify({"default": default_model, "models": models_list})
 

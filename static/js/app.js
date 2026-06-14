@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let modelsData = [];
     let defaultModel = "";
 
-    // ── Load available models ──
     async function loadModels() {
         try {
             const res = await fetch("/api/models");
@@ -60,7 +59,6 @@ document.addEventListener("DOMContentLoaded", () => {
     modelSelect.addEventListener("change", updateMetricsBar);
     loadModels();
 
-    // ── Form Submission ──
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -69,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const [key, value] of formData.entries()) {
             payload[key] = value;
         }
-        // Use the selected model key
+        
         payload.model = modelSelect.value;
 
         submitBtn.classList.add("loading");
@@ -98,19 +96,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // ── Reset ──
     resetBtn.addEventListener("click", () => {
         resultContent.classList.add("hidden");
         resultError.classList.add("hidden");
         resultPlaceholder.classList.remove("hidden");
 
-        // Reset the gauge immediately
         const gaugeFill = document.getElementById("gauge-fill");
         gaugeFill.style.strokeDasharray = "0 251.33";
 
         form.reset();
 
-        // Restore the default model selection
         if (defaultModel) {
             modelSelect.value = defaultModel;
             updateMetricsBar();
@@ -119,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
-    // ── Display Result ──
     function showResult(data, payload) {
         resultPlaceholder.classList.add("hidden");
         resultError.classList.add("hidden");
@@ -128,21 +122,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const isApproved = data.prediction === "Approved";
         const prob = data.probability;
 
-        // Status Icon
         const statusIcon = document.getElementById("status-icon");
         statusIcon.className = "status-icon " + (isApproved ? "approved" : "rejected");
         statusIcon.innerHTML = isApproved ? "✓" : "✗";
 
-        // Status Text
         const statusText = document.getElementById("status-text");
         statusText.textContent = data.prediction;
         statusText.className = "status-text " + (isApproved ? "approved" : "rejected");
 
-        // Model used label
         const modelLabel = document.getElementById("model-used-label");
         modelLabel.textContent = `Model: ${data.model_used}`;
 
-        // Gauge
         const gaugeFill = document.getElementById("gauge-fill");
         const gaugeValue = document.getElementById("gauge-value");
 
@@ -154,7 +144,6 @@ document.addEventListener("DOMContentLoaded", () => {
         else if (prob >= 35) gaugeColor = "#f59e0b";
         else gaugeColor = "#ef4444";
 
-        // Reset then animate
         gaugeFill.style.strokeDasharray = "0 251.33";
         setTimeout(() => {
             gaugeFill.style.stroke = gaugeColor;
@@ -163,7 +152,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         animateCounter(gaugeValue, 0, prob, 1000);
 
-        // Details
         const details = document.getElementById("result-details");
         const loanPercent =
             payload.person_income > 0
@@ -202,7 +190,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // ── Display Error ──
     function showError(msg) {
         resultPlaceholder.classList.add("hidden");
         resultContent.classList.add("hidden");
@@ -210,7 +197,6 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("error-message").textContent = msg;
     }
 
-    // ── Counter Animation ──
     function animateCounter(element, start, end, duration) {
         const startTime = performance.now();
         function update(currentTime) {
